@@ -1,0 +1,34 @@
+#!/usr/bin/env sh
+
+testdir() {
+  test -d "$1" &&
+  test -r "$1" &&
+  test -w "$1" &&
+  test -x "$1" &&
+  test ! -L "$1" &&
+  test "$PERSONAL_TRASHCAN" || 
+    test -k "$1" ||
+    echo "Warning: Sticky Bit not set for $1" > /dev/stderr
+}
+# findmnt -o TARGET -l -T
+# topdirs=$(df --output=target | tail -n+2)
+topdir=$(df --output=target -- "${1:-$PWD}" | tail -1)
+htopdir=$(df --output=target ~ | tail -1)
+
+[ "$topdir" != "$htopdir" ] && {
+  trashdir="$topdir/.Trashcan" &&
+  mkdir -p "$trashdir" &&
+  { chmod 1777 "$trashdir" || true; } &&
+  testdir "$trashdir" &&
+  echo "$trashdir" || {
+    echo "Could not create trashcan at $topdir, using $HOME/.local/Trash " > /dev/stderr &&
+    false
+  }
+} || {
+  mkdir -p ~/.local/Trash --mode 700 &&
+  PERSONAL_TRASHCAN="true" testdir ~/.local/Trash/ &&
+  echo ~/.local/Trash
+} && exit
+
+echo "Could not use trashcan at $HOME/.local/Trash" > /dev/stderr
+exit 1

@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+IFS='
+'
+for file in $(lstrash "$1" "$2" "To Remove")
+do rm -vrf "$file"
+done
+

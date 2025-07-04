@@ -1,0 +1,4 @@
+#!/usr/bin/env cached-nix-shell
+#!nix-shell -i dash -p tesseract grimblast wl-clipboard
+
+grimblast save area - | tesseract - - -l eng+jpn | wl-copy

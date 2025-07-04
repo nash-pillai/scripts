@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+
+dirs=$(get-trash-dir "$1")
+preview="[ -d {3} ] &&
+exa --group-directories-first -lah {3} ||
+bat --style=numbers --color=always {3}"
+[ "$COLUMNS" -lt 80 ] && preview_options="up"
+
+for dir in $dirs
+# find "$dir" -maxdepth 1 -exec sh -c '
+do fd -d1 -H --base-directory="$dir" -x sh -c '
+  [ $(stat -c"%U" "$1") = "$USER" ] || exit
+  alias getfattr="getfattr --only-values -n"
+  getfattr user.trashed-time "$1" |
+      sed -Ee "s/,.+//" -e "s/T/ /"
+  printf "\t"
+  getfattr user.trashed-location "$1"
+  printf "\t"
+  echo "$2/$1"
+' - {} "$dir" \; |
+
+  sort -t"	" $2 |
+  sed "s|\t$HOME|\t~|" |
+
+  fzf --tac -m -d'	' --preview "$preview" \
+    --preview-window="$preview_options" \
+    --with-nth=1,2 --header "Select Files $3" |
+  awk 'BEGIN{FS=OFS="\t"}{print $3}'
+done

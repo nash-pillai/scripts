@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+# [ "$DISPLAY" ] &&
+#   passapp="pinentry-qt" ||
+#   passapp="pinentry-curses"
+# echo 'getpin' | "$passapp" |
+echo 'getpin' | pinentry-gtk-2 | awk '/^D /{print $0}' | cut -c3-
+

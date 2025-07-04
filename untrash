@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+IFS='
+'
+for file in $(lstrash "$1" "$2" "To Restore")
+do restore "$file"
+done
+

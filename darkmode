@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+cp "$XDG_CONFIG_HOME/gtk-3.0/settings-dark.ini" "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+brightness 10%
+pkill hyprsunset
+hyprsunset -t 4000

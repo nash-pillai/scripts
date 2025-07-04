@@ -1,0 +1,27 @@
+#!/usr/bin/env cached-nix-shell
+#! nix-shell -i sh -p discordchatexporter-cli
+
+export DISCORD_TOKEN="$(cat ~/.data/discord-token)"
+
+mkdir -v /Media/Archive/Discord/$(date -I) || exit
+cd /Media/Archive/Discord/$(date -I)
+
+IFS=$'\n'
+for guild in $(discordchatexporter-cli guilds)
+do
+  id=$(echo $guild | sed -E 's/ +\| .*//g')
+  name=$(echo $guild | sed -E 's/.* \| //g')
+  #       DM         Robotics                    Scoily                      CSHS                         CLAN
+  [ $id = 0 -o $id = 657315721482731531 -o $id = 885293348242472960 -o $id = 1032443373518340206 -o $id = 385496460906594304 ] || continue
+  echo "$id=$name"
+  discordchatexporter-cli exportguild -g $id --parallel 5 -o "$name/"
+done
+echo Done
+
+for dir in *
+do cd "$dir"
+  for file in *
+  do mv "$file" "$(echo "$file" | sed "s/$dir - //")"
+  done
+  cd ..
+done

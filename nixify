@@ -1,0 +1,22 @@
+if [ ! -e ./.envrc ]; then
+	echo "use nix" >.envrc
+	cat >>.gitignore <<'EOF'
+
+# Nix Env Cache
+.direnv/
+EOF
+	direnv allow
+fi
+if [[ ! -e shell.nix ]] && [[ ! -e default.nix ]]; then
+	cat >shell.nix <<'EOF'
+with import <nixpkgs> {};
+let unstable = import <unstable> {};
+in mkShell {
+	buildInputs = [
+		nodejs unstable.nodePackages.pnpm
+		doppler stripe-cli nodePackages.vercel
+	];
+}
+EOF
+	${EDITOR:-vim} shell.nix
+fi

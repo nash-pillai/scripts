@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+
+while true; do
+	input=$(zellij ls | fzf --print-query)
+	case $? in 
+		0)
+			zellij a -c "$(echo "$input" | tail -n1 -)"
+			;;
+		1)
+			zellij a -c "$(echo "$input" | tail -n1 -)"
+			;;
+		130)
+			break
+			;;
+	esac
+done

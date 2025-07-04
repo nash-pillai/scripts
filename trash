@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+
+for file in "$@"; do
+  if [ ! -e "$file" ]; then echo "$file does not exist" && continue; fi
+  setfattr -n user.trashed-time -v "$(date -Ins)" "$file"
+  setfattr -n user.trashed-location -v "$(realpath "$file")" "$file"
+  mv --backup=numbered -t "$(get-trash-dir "$file" | head -1)" "$file"
+done
+

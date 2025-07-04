@@ -1,0 +1,8 @@
+XDG_RUNTIME_DIR = /run/user/1000
+
+# Needs XDG_CONFIG_HOME
+%daily   * 7-18 . ~/.zshenv; lightmode
+%nightly * 18-7 . ~/.zshenv; darkmode
+
+# Needs XAUTHORITY which needs XDG_RUNTIME_DIR
+@ 30            . ~/.zshenv

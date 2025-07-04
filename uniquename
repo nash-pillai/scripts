@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+
+[ ! -e $1 ] && echo $1 && exit
+
+
+default_affix=".~{}~"
+num=1
+# echo "$1" | awk -v A="$affix" 'BEGIN{FS=OFS="/"}{$NF=A$NF}1y'
+while affix="$(echo "${2:-$default_affix}" | sed "s|{}|$num|")" && {
+      [ "$3" = "-p" ] && file=$(
+        echo "$1" | awk -v A="$affix" 'BEGIN{FS=OFS="/"}{$NF=A$NF}1y'
+      ) || file="$1$affix"
+    } && [ -e "$file" ]
+do : $((num+=1)); done
+echo "$file"
+

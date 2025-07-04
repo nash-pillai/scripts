@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+for drive in $(command ls ~/.config/gdfuse)
+do mkdir -p "$HOME/remote/$drive"
+   mount | grep "$HOME/remote/$drive" >/dev/null || gdfuse -label "$drive" "$HOME/remote/$drive"
+done

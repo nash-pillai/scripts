@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+
+for file in "$@"; do
+  location=$(getfattr --absolute-names --only-values -n user.trashed-location "$file")
+  echo "Restoring $file to $location"
+  [ -e "$location" ] && echo "Location is occupied" && continue
+  mv -T "$file" "$location" || continue
+  setfattr -x user.trashed-time "$location"
+  setfattr -x user.trashed-location "$location"
+done

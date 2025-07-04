@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+hyprctl hyprpaper preload $1
+hyprctl hyprpaper wallpaper "$2,$1"
+sleep 1
+hyprctl hyprpaper unload $(/tmp/wallpaper)
+echo $1 > /tmp/wallpaper
