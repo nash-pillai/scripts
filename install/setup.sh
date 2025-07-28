@@ -1,5 +1,8 @@
 #!/usr/bin/env sh
 
+sudo nix-channel --add https://nixos.org/channels/nixos-unstable unstable
+sudo nix-channel --update
+
 cd ~
 
 git clone https://github.com/nash-pillai/config.git .config
@@ -24,6 +27,8 @@ home_links=('minecraft' 'floorp' 'ssh' 'thunderbird')
 for dir in "${config_links[@]}" "${home_links[@]}"; do
     mkdir -p ~/.data/$dir
 done
+mkdir -p ~/.data/gnupg
+chmod 700 ~/.data/gnupg
 
 sudo mkdir -p /Media/Wallpapers/ /Media/Code/
 sudo chown -R nash:users /Media/
