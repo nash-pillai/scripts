@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+
+vpn_url=vpn.gatech.edu
+protocol=gp
+gateway="DC Gateway"
+
+user=npillai40
+pass=$(op item get u3qkamsgcvkbbsukinwwe74ioa --reveal --fields label=pass1 || exit)
+
+
+# Test if running from terminal
+if [[ $DISPLAY ]]; then
+    # Running from terminal
+    sudo -v && printf "$pass\npush\n$gateway\n" | sudo openconnect --protocol=$protocol "$vpn_url" -u $user|| notify-send "VPN Connection Failed"
+else
+    # Running from rofi
+    $TERM --class=floating -e bash -c 'sudo -v && printf "$pass\npush\n$gateway\n" | sudo openconnect --protocol=$protocol $vpn_url -u $user || notify-send "VPN Connection Failed"'
+fi
