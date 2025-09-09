@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 if [ ! -e ./.envrc ]; then
 	echo "use nix" >.envrc
 	cat >>.gitignore <<'EOF'
