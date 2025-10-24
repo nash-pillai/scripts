@@ -1,4 +1,6 @@
 #!/usr/bin/env zsh
 
-files=(/Media/Wallpapers/OneDark/*(.)) && wallpaper $files[$((RANDOM % ${#files} + 1))] eDP-1
-files=(/Media/Wallpapers/OneDark/*(.)) && wallpaper $files[$((RANDOM % ${#files} + 1))] DP-1
+monitors=(eDP-1 eDP-2 DP-1 DP-2 HDMI-1)
+for monitor in $monitors; do
+	files=(/Media/Wallpapers/OneDark/*(.)) && wallpaper $files[$((RANDOM % ${#files} + 1))] $monitor
+done
