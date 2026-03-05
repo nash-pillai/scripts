@@ -5,7 +5,7 @@ sudo nix-channel --update
 
 sudo ln -s /home/nash/.state/nix/profile/bin/gh /usr/bin/gh
 
-cd ~
+cd ~ || exit
 
 git clone https://github.com/nash-pillai/config.git .config
 mkdir -p .local/scripts
@@ -19,11 +19,11 @@ xdg-user-dirs-update
 config_links=(1Password 'Badlion Client' cef_user_data Element Insomnia mozc BambuStudio Bitwarden chromium discord docker launcher obsidian heroic libreoffice vivaldi Slack)
 home_links=('minecraft' 'floorp' 'ssh' 'thunderbird')
 for dir in "${config_links[@]}"; do
-    mkdir -p ~/.data/$dir
-    ln -sfT ../.data/$dir .config/$dir
+    mkdir -p "$HOME/.data/$dir"
+    ln -sfT "../.data/$dir" ".config/$dir"
 done
 for dir in "${home_links[@]}"; do
-    mkdir -p ~/.data/$dir
+    mkdir -p "$HOME/.data/$dir"
 done
 mkdir -p ~/.data/gnupg
 chmod 700 ~/.data/gnupg
@@ -42,10 +42,7 @@ ln -s .data/ssh .ssh
 ln -s .data/thunderbird .thunderbird
 # ln -fs .config/floorp/chrome .data/floorp/*.default/chrome
 
-cd /Media/Code
-
-git clone --depth 1 https://github.com/hlissner/doom-emacs emacs
-doom install
+cd /Media/Code || exit
 
 git clone https://github.com/nash-pillai/stapplet.git
 git clone https://github.com/nash-pillai/stapplet-new.git

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+FORM_URL="https://docs.google.com/forms/d/e/1FAIpQLScFHR00lOF0waXRNhSW1dgvTMTXY_PaWmTyfnOzqq3z3fq9oA/formResponse"
+
+case "$1" in
+  ctf)
+    MEETING_TYPE="CTF+Meeting"
+    ;;
+  gen)
+    MEETING_TYPE="General+Meeting"
+    ;;
+  *)
+    echo "Usage: $0 {ctf|gen}"
+    exit 1
+    ;;
+esac
+
+if curl -s -f -o /dev/null -X POST "$FORM_URL" \
+  -d "entry.1707828675=Nash+Pillai" \
+  -d "entry.882257050=nash.pillai@gatech.edu" \
+  -d "entry.279643587=${MEETING_TYPE}"; then
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send "gh-attendance" "Submitted: ${MEETING_TYPE//+/ }"
+  fi
+fi

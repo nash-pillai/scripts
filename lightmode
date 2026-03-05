@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 
-cp "$XDG_CONFIG_HOME/gtk-3.0/settings-light.ini" "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+# cp "$XDG_CONFIG_HOME/gtk-3.0/settings-light.ini" "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+dconf write /org/gnome/desktop/interface/color-scheme '"prefer-light"'
 brightness 90%
 pkill hyprsunset
-hyprsunset -t 4000
+# hyprsunset -t 4000

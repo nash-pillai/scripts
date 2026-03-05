@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+ENDPOINT="https://quack.duckduckgo.com/api/email/addresses"
+TOKEN_FILE="${XDG_DATA_HOME:-$HOME/.local/share}/duck_email.token"
+
+if [ ! -r "$TOKEN_FILE" ]; then
+    echo "Error: token file not found or unreadable: $TOKEN_FILE" >&2
+    exit 1
+fi
+
+API_TOKEN="$(tr -d '\r\n' < "$TOKEN_FILE")"
+
+if [ -z "$API_TOKEN" ]; then
+    echo "Error: token file is empty: $TOKEN_FILE" >&2
+    exit 1
+fi
+
+
+response=$(curl -s -X POST "$ENDPOINT" \
+        -H "Authorization: Bearer $API_TOKEN" \
+        -H "Content-Type: application/json" \
+        -H "User-Agent: Mozilla/5.0 (compatible; DuckDuckGo Email Client)")
+    
+    if [ $? -eq 0 ]; then
+        # Extract the email address from the response
+        # The exact JSON structure may vary, so you might need to adjust this
+        alias_email=$(echo "$response" | jq -r '.address' 2>/dev/null)
+        
+        if [ -n "$alias_email" ]; then
+            email="$alias_email@duck.com"
+            echo "$email"
+
+            if command -v wl-copy >/dev/null 2>&1; then
+                printf '%s' "$email" | wl-copy
+
+                if command -v notify-send >/dev/null 2>&1; then
+                    notify-send "duck-email" "Copied: $email"
+                fi
+            fi
+        else
+            echo "Response received but couldn't parse email address:"
+            echo "$response" | jq . 2>/dev/null || echo "$response"
+        fi
+    else
+        echo "Error: Failed to connect to API"
+    fi
