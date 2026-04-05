@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+payload="$1"
+
+event_type=$(printf '%s' "$payload" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("type",""))')
+[ "$event_type" = "agent-turn-complete" ] || exit 0
+
+body=$(printf '%s' "$payload" | python3 -c 'import sys, json; d=json.load(sys.stdin); print(d.get("last-assistant-message","Done responding"))')
+
+notify-send -a "Codex" "Codex" "$body"

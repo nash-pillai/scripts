@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Wrapper: stores clipboard to cliphist and records timestamp sidecar
+TIMESTAMP_FILE="$HOME/.local/share/cliphist-meta/timestamps"
+mkdir -p "$(dirname "$TIMESTAMP_FILE")"
+
+# Store clipboard data (stdin from wl-paste --watch)
+cliphist store
+
+# Record timestamp for the most recent entry
+latest_id=$(cliphist list | head -1 | cut -f1)
+ts=$(date +%s)
+
+if grep -q "^${latest_id}	" "$TIMESTAMP_FILE" 2>/dev/null; then
+    sed -i "s/^${latest_id}	.*/${latest_id}	${ts}/" "$TIMESTAMP_FILE"
+else
+    echo -e "${latest_id}\t${ts}" >> "$TIMESTAMP_FILE"
+fi
+
+# Prune to last 1000 entries
+if [[ $(wc -l < "$TIMESTAMP_FILE" 2>/dev/null) -gt 1000 ]]; then
+    tail -1000 "$TIMESTAMP_FILE" > "$TIMESTAMP_FILE.tmp"
+    mv "$TIMESTAMP_FILE.tmp" "$TIMESTAMP_FILE"
+fi

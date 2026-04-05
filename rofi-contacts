@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+"""Rofi-based Google Contacts browser using gws CLI."""
+
+import json
+import os
+import subprocess
+import sys
+import hashlib
+import tempfile
+from pathlib import Path
+
+CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "rofi-contacts"
+CONTACTS_CACHE = CACHE_DIR / "contacts.json"
+PHOTOS_DIR = CACHE_DIR / "photos"
+PERSON_FIELDS = "names,emailAddresses,phoneNumbers,photos,organizations,addresses,birthdays,urls,nicknames,biographies"
+PAGE_SIZE = 1000
+MAX_PAGES = 50
+
+
+def ensure_dirs():
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def fetch_contacts():
+    """Fetch all contacts from Google People API via gws CLI."""
+    result = subprocess.run(
+        [
+            "gws", "people", "people", "connections", "list",
+            "--params", json.dumps({
+                "resourceName": "people/me",
+                "personFields": PERSON_FIELDS,
+                "pageSize": PAGE_SIZE,
+                "sortOrder": "FIRST_NAME_ASCENDING",
+            }),
+            "--page-all",
+            "--page-limit", str(MAX_PAGES),
+        ],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        rofi_error(f"Failed to fetch contacts:\n{result.stderr}")
+        sys.exit(1)
+
+    contacts = []
+    for line in result.stdout.strip().splitlines():
+        if not line.strip():
+            continue
+        page = json.loads(line)
+        contacts.extend(page.get("connections", []))
+
+    # Atomic write so concurrent readers never see a partial file
+    tmp = tempfile.NamedTemporaryFile("w", dir=CACHE_DIR, suffix=".tmp", delete=False)
+    try:
+        json.dump(contacts, tmp, indent=2)
+        tmp.close()
+        os.replace(tmp.name, CONTACTS_CACHE)
+    except BaseException:
+        tmp.close()
+        os.unlink(tmp.name)
+        raise
+    return contacts
+
+
+def load_contacts():
+    """Load contacts from cache or fetch fresh."""
+    if CONTACTS_CACHE.exists():
+        return json.loads(CONTACTS_CACHE.read_text())
+    return fetch_contacts()
+
+
+def download_photo(url, resource_name):
+    """Download a contact photo, return local path."""
+    photo_id = hashlib.md5(resource_name.encode()).hexdigest()
+    photo_path = PHOTOS_DIR / f"{photo_id}.png"
+    if photo_path.exists():
+        return str(photo_path)
+    try:
+        subprocess.run(
+            ["curl", "-sL", "-o", str(photo_path), url],
+            timeout=5, capture_output=True,
+        )
+        if photo_path.exists() and photo_path.stat().st_size > 0:
+            return str(photo_path)
+    except Exception:
+        pass
+    return ""
+
+
+def get_display_name(contact):
+    names = contact.get("names", [])
+    if names:
+        return names[0].get("displayName", "Unknown")
+    emails = contact.get("emailAddresses", [])
+    if emails:
+        return emails[0].get("value", "Unknown")
+    phones = contact.get("phoneNumbers", [])
+    if phones:
+        return phones[0].get("value", "Unknown")
+    return "Unknown"
+
+
+def get_photo_url(contact):
+    photos = contact.get("photos", [])
+    for p in photos:
+        if not p.get("default", False):
+            return p.get("url", "")
+    return ""
+
+
+def get_org_line(contact):
+    orgs = contact.get("organizations", [])
+    if orgs:
+        parts = []
+        title = orgs[0].get("title", "")
+        name = orgs[0].get("name", "")
+        if title:
+            parts.append(title)
+        if name:
+            parts.append(name)
+        return " @ ".join(parts)
+    return ""
+
+
+def rofi_error(msg):
+    subprocess.run(["rofi", "-e", msg])
+
+
+def rofi_select(entries, prompt="Contacts", mesg=None, kb_custom=None):
+    """Show rofi dmenu with entries. Each entry is (display_text, icon_path or None).
+    kb_custom is a list of (key, label) for custom keybindings (kb-custom-1, kb-custom-2, ...).
+    Returns (index, exit_code). exit_code 0 = normal select, 10+ = custom keybinding."""
+    input_lines = []
+    for display, icon in entries:
+        if icon:
+            input_lines.append(f"{display}\0icon\x1f{icon}")
+        else:
+            input_lines.append(display)
+
+    cmd = [
+        "rofi", "-dmenu", "-i",
+        "-p", prompt,
+        "-show-icons",
+        "-markup-rows",
+        "-format", "i",  # return index
+    ]
+    if mesg:
+        cmd.extend(["-mesg", mesg])
+    for i, (key, _label) in enumerate(kb_custom or []):
+        cmd.extend([f"-kb-custom-{i + 1}", key])
+
+    result = subprocess.run(
+        cmd,
+        input="\n".join(input_lines),
+        capture_output=True, text=True,
+    )
+    if result.returncode not in (0, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19):
+        return -1, result.returncode
+    try:
+        return int(result.stdout.strip()), result.returncode
+    except ValueError:
+        return -1, result.returncode
+
+
+def build_contact_fields(contact):
+    """Extract all copyable fields from a contact as (label, value) pairs."""
+    fields = []
+
+    for name in contact.get("names", []):
+        fields.append(("Name", name.get("displayName", "")))
+
+    for nick in contact.get("nicknames", []):
+        fields.append(("Nickname", nick.get("value", "")))
+
+    for email in contact.get("emailAddresses", []):
+        label = email.get("formattedType", "Email")
+        fields.append((f"Email ({label})", email.get("value", "")))
+
+    for phone in contact.get("phoneNumbers", []):
+        label = phone.get("formattedType", "Phone")
+        val = phone.get("canonicalForm") or phone.get("value", "")
+        fields.append((f"Phone ({label})", val))
+
+    for org in contact.get("organizations", []):
+        if org.get("name"):
+            fields.append(("Organization", org["name"]))
+        if org.get("title"):
+            fields.append(("Job Title", org["title"]))
+
+    for addr in contact.get("addresses", []):
+        label = addr.get("formattedType", "Address")
+        val = addr.get("formattedValue", "")
+        if val:
+            fields.append((f"Address ({label})", val.replace("\n", ", ")))
+
+    for bday in contact.get("birthdays", []):
+        date = bday.get("date", {})
+        parts = []
+        if date.get("year"):
+            parts.append(str(date["year"]))
+        if date.get("month"):
+            parts.append(str(date["month"]).zfill(2))
+        if date.get("day"):
+            parts.append(str(date["day"]).zfill(2))
+        if parts:
+            fields.append(("Birthday", "-".join(parts)))
+
+    for url in contact.get("urls", []):
+        label = url.get("formattedType", "URL")
+        fields.append((f"URL ({label})", url.get("value", "")))
+
+    for bio in contact.get("biographies", []):
+        val = bio.get("value", "")
+        if val:
+            fields.append(("Notes", val[:100]))
+
+    return [(l, v) for l, v in fields if v]
+
+
+def get_contact_google_url(contact):
+    """Build Google Contacts edit URL from resource name."""
+    rn = contact.get("resourceName", "")
+    # resourceName is like "people/c7532479125320093687"
+    if rn.startswith("people/"):
+        person_id = rn[len("people/"):]
+        return f"https://contacts.google.com/person/{person_id}"
+    return "https://contacts.google.com"
+
+
+def copy_to_clipboard(text):
+    subprocess.run(["wl-copy", text], check=True)
+
+
+def main():
+    ensure_dirs()
+
+    # Handle --refresh flag
+    if "--refresh" in sys.argv:
+        fetch_contacts()
+        if len(sys.argv) == 2:
+            # Just refresh, don't show UI
+            print("Contacts cache refreshed.")
+            return
+
+    contacts = load_contacts()
+    if not contacts:
+        contacts = fetch_contacts()
+    if not contacts:
+        rofi_error("No contacts found.")
+        return
+
+    # Build contact list entries
+    entries = []
+    for c in contacts:
+        name = get_display_name(c)
+        org = get_org_line(c)
+        emails = [e.get("value", "") for e in c.get("emailAddresses", [])]
+        phones = [p.get("value", "") for p in c.get("phoneNumbers", [])]
+
+        # Build subtitle
+        parts = []
+        if org:
+            parts.append(f"<i>{org}</i>")
+        if emails:
+            parts.append(emails[0])
+        if phones:
+            parts.append(phones[0])
+        subtitle = "  ".join(parts)
+
+        display = f"<b>{name}</b>"
+        if subtitle:
+            display += f"  <span size='small' alpha='60%'>{subtitle}</span>"
+
+        # Photo
+        photo_url = get_photo_url(c)
+        icon = ""
+        if photo_url:
+            icon = download_photo(photo_url, c.get("resourceName", ""))
+
+        entries.append((display, icon))
+
+    # Show contact list (Ctrl+O opens in browser directly)
+    kb = [("control+o", "Open in browser")]
+    idx, exit_code = rofi_select(entries, prompt="Contacts",
+                                  mesg="<i>Ctrl+O: open in browser</i>",
+                                  kb_custom=kb)
+    if idx < 0 or idx >= len(contacts):
+        return
+
+    contact = contacts[idx]
+    google_url = get_contact_google_url(contact)
+
+    # Ctrl+O pressed — open in browser immediately
+    if exit_code == 10:
+        subprocess.run(["xdg-open", google_url])
+        return
+
+    # Show field picker for selected contact
+    fields = build_contact_fields(contact)
+
+    field_entries = []
+    for label, value in fields:
+        field_entries.append((f"<b>{label}:</b>  {value}", ""))
+
+    field_entries.append(("<i>Open in Google Contacts</i>", ""))
+
+    name = get_display_name(contact)
+    photo_url = get_photo_url(contact)
+    icon = ""
+    if photo_url:
+        icon = download_photo(photo_url, contact.get("resourceName", ""))
+
+    # Re-show rofi for field selection (Ctrl+O also works here)
+    field_display = [(text, icon if i == 0 else "") for i, (text, _) in enumerate(field_entries)]
+    field_idx, field_exit = rofi_select(field_display, prompt=name,
+                                         mesg="<i>Ctrl+O: open in browser</i>",
+                                         kb_custom=kb)
+    if field_idx < 0:
+        return
+
+    if field_exit == 10 or field_idx == len(fields):
+        # Open in browser
+        subprocess.run(["xdg-open", google_url])
+    else:
+        _, value = fields[field_idx]
+        copy_to_clipboard(value)
+
+
+if __name__ == "__main__":
+    main()
